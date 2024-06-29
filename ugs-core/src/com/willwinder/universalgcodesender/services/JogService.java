@@ -138,7 +138,7 @@ public class JogService {
     }
 
     public void divideABCStepSize() {
-        setStepSizeABC(divideSize(getStepSizeZ()));
+        setStepSizeABC(divideSize(getStepSizeABC()));
     }
 
     public void multiplyXYStepSize() {
@@ -328,7 +328,7 @@ public class JogService {
         try {
             backend.getController().jogMachineTo(position, getFeedRate());
         } catch (Exception e) {
-            logger.log(Level.WARNING,  "Couldn't jog to position " + position, e);
+            logger.log(Level.WARNING, e, () -> String.format("Couldn't jog to position %s", position));
         }
     }
 }

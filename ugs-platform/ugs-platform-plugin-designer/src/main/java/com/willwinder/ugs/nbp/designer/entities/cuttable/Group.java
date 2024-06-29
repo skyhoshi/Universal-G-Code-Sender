@@ -22,7 +22,7 @@ import com.willwinder.ugs.nbp.designer.entities.Entity;
 import com.willwinder.ugs.nbp.designer.entities.EntityGroup;
 import com.willwinder.ugs.nbp.designer.entities.EntitySetting;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -33,9 +33,12 @@ import java.util.stream.Stream;
  * @author Joacim Breiler
  */
 public class Group extends EntityGroup implements Cuttable {
+    private final CuttableEntitySettings entitySettings;
+
 
     public Group() {
         setName("Group");
+        entitySettings = new CuttableEntitySettings(this);
     }
 
     @Override
@@ -97,6 +100,57 @@ public class Group extends EntityGroup implements Cuttable {
     }
 
     @Override
+    public int getSpindleSpeed() {
+        return getCuttableStream()
+                .mapToInt(Cuttable::getSpindleSpeed)
+                .max()
+                .orElse(0);
+    }
+
+    @Override
+    public void setSpindleSpeed(int spindleSpeed) {
+        getChildren().forEach(child -> {
+            if (child instanceof Cuttable cuttable) {
+                cuttable.setSpindleSpeed(spindleSpeed);
+            }
+        });
+    }
+
+    @Override
+    public int getFeedRate() {
+        return getCuttableStream()
+                .mapToInt(Cuttable::getFeedRate)
+                .max()
+                .orElse(0);
+    }
+
+    @Override
+    public void setFeedRate(int feedRate) {
+        getChildren().forEach(child -> {
+            if (child instanceof Cuttable cuttable) {
+                cuttable.setFeedRate(feedRate);
+            }
+        });
+    }
+
+    @Override
+    public int getPasses() {
+        return getCuttableStream()
+                .mapToInt(Cuttable::getPasses)
+                .max()
+                .orElse(0);
+    }
+
+    @Override
+    public void setPasses(int passes) {
+        getChildren().forEach(child -> {
+            if (child instanceof Cuttable cuttable) {
+                cuttable.setPasses(passes);
+            }
+        });
+    }
+
+    @Override
     public boolean isHidden() {
         return getCuttableStream()
                 .findFirst()
@@ -111,6 +165,16 @@ public class Group extends EntityGroup implements Cuttable {
                 cuttable.setHidden(hidden);
             }
         });
+    }
+
+    @Override
+    public Optional<Object> getEntitySetting(EntitySetting entitySetting) {
+        return entitySettings.getEntitySetting(entitySetting);
+    }
+
+    @Override
+    public void setEntitySetting(EntitySetting entitySetting, Object value) {
+        entitySettings.setEntitySetting(entitySetting, value);
     }
 
     private Stream<Cuttable> getCuttableStream() {
@@ -128,25 +192,44 @@ public class Group extends EntityGroup implements Cuttable {
         return copy;
     }
 
-    public Optional<Entity> getFirstChild() {
-        if (getChildren().isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(getChildren().get(0));
-    }
-
     @Override
     public List<EntitySetting> getSettings() {
-        return Arrays.asList(
-                EntitySetting.ANCHOR,
-                EntitySetting.POSITION_X,
-                EntitySetting.POSITION_Y,
-                EntitySetting.WIDTH,
-                EntitySetting.HEIGHT,
-                EntitySetting.CUT_TYPE,
-                EntitySetting.START_DEPTH,
-                EntitySetting.TARGET_DEPTH
-        );
+        List<List<EntitySetting>> list = getCuttableStream().map(Entity::getSettings).toList();
+        if (list.isEmpty()) {
+            return List.of();
+        }
+
+        List<EntitySetting> result = list.get(0);
+        for (List<EntitySetting> settings : list) {
+            result.retainAll(settings);
+        }
+
+        // Remove cut type if they are of differnt types
+        if (getCuttableStream().map(Cuttable::getCutType).distinct().toList().size() > 1) {
+            result = new ArrayList<>(result);
+            result.remove(EntitySetting.CUT_TYPE);
+        }
+
+        if (getCuttableStream().map(Cuttable::getStartDepth).distinct().toList().size() > 1) {
+            result = new ArrayList<>(result);
+            result.remove(EntitySetting.START_DEPTH);
+        }
+
+        if (getCuttableStream().map(Cuttable::getTargetDepth).distinct().toList().size() > 1) {
+            result = new ArrayList<>(result);
+            result.remove(EntitySetting.TARGET_DEPTH);
+        }
+
+        if (getCuttableStream().map(Cuttable::getSpindleSpeed).distinct().toList().size() > 1) {
+            result = new ArrayList<>(result);
+            result.remove(EntitySetting.SPINDLE_SPEED);
+        }
+
+        if (getCuttableStream().map(Cuttable::getFeedRate).distinct().toList().size() > 1) {
+            result = new ArrayList<>(result);
+            result.remove(EntitySetting.FEED_RATE);
+        }
+
+        return result;
     }
 }

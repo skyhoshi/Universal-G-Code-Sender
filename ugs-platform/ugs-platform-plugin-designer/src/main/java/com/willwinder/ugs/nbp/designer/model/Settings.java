@@ -35,7 +35,9 @@ public class Settings {
     private UnitUtils.Units preferredUnits = UnitUtils.Units.MM;
     private double toolStepOver = 0.3;
     private double depthPerPass = 1;
-    private double spindleSpeed;
+    private double laserDiameter = 0.2;
+    private int maxSpindleSpeed = 255;
+    private boolean detectMaxSpindleSpeed = true;
 
     public Settings() {
     }
@@ -152,11 +154,6 @@ public class Settings {
         return Utils.formatter.format(getStockThickness() * scale) + " " + getPreferredUnits().abbreviation;
     }
 
-    public String getToolDescription() {
-        double scale = UnitUtils.scaleUnits(UnitUtils.Units.MM, getPreferredUnits());
-        return Utils.formatter.format(getToolDiameter() * scale) + " " + getPreferredUnits().abbreviation;
-    }
-
     public double getDepthPerPass() {
         return depthPerPass;
     }
@@ -170,26 +167,52 @@ public class Settings {
         notifyListeners();
     }
 
-    public double getSpindleSpeed() {
-        return spindleSpeed;
+    public void applySettings(Settings settings) {
+        if (settings == null) {
+            return;
+        }
+
+        setDepthPerPass(settings.getDepthPerPass());
+        setFeedSpeed(settings.getFeedSpeed());
+        setPlungeSpeed(settings.getPlungeSpeed());
+        setStockThickness(settings.getStockThickness());
+        setToolDiameter(settings.getToolDiameter());
+        setToolStepOver(settings.getToolStepOver());
+        setPreferredUnits(settings.getPreferredUnits());
+        setSafeHeight(settings.getSafeHeight());
+        setLaserDiameter(settings.getLaserDiameter());
+        setMaxSpindleSpeed(settings.getMaxSpindleSpeed());
+        setDetectMaxSpindleSpeed(settings.getDetectMaxSpindleSpeed());
+
     }
 
-    public void setSpindleSpeed(double spindleSpeed) {
-        this.spindleSpeed = Math.abs(spindleSpeed);
+    public double getLaserDiameter() {
+        return laserDiameter;
+    }
+
+    public void setLaserDiameter(double laserDiameter) {
+        this.laserDiameter = laserDiameter;
         notifyListeners();
     }
 
-    public void applySettings(Settings settings) {
-        if (settings != null) {
-            setDepthPerPass(settings.getDepthPerPass());
-            setFeedSpeed(settings.getFeedSpeed());
-            setPlungeSpeed(settings.getPlungeSpeed());
-            setStockThickness(settings.getStockThickness());
-            setToolDiameter(settings.getToolDiameter());
-            setToolStepOver(settings.getToolStepOver());
-            setPreferredUnits(settings.getPreferredUnits());
-            setSafeHeight(settings.getSafeHeight());
-            setSpindleSpeed(settings.getSpindleSpeed());
+    public int getMaxSpindleSpeed() {
+        return maxSpindleSpeed;
+    }
+
+    public void setMaxSpindleSpeed(int maxSpindleSpeed) {
+        if (this.maxSpindleSpeed == Math.abs(maxSpindleSpeed)) {
+            return;
         }
+        this.maxSpindleSpeed = Math.abs(maxSpindleSpeed);
+        notifyListeners();
+    }
+
+    public boolean getDetectMaxSpindleSpeed() {
+        return detectMaxSpindleSpeed;
+    }
+
+    public void setDetectMaxSpindleSpeed(boolean detectMaxSpindleSpeed) {
+        this.detectMaxSpindleSpeed = detectMaxSpindleSpeed;
+        notifyListeners();
     }
 }

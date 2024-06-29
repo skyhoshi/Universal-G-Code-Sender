@@ -22,9 +22,14 @@ import com.willwinder.ugs.nbp.designer.Utils;
 import com.willwinder.ugs.nbp.designer.entities.Anchor;
 import com.willwinder.ugs.nbp.designer.entities.EntitySetting;
 import com.willwinder.ugs.nbp.designer.entities.cuttable.CutType;
+import com.willwinder.ugs.nbp.designer.entities.cuttable.Group;
+import com.willwinder.ugs.nbp.designer.entities.cuttable.Text;
+import com.willwinder.ugs.nbp.designer.logic.Controller;
+import com.willwinder.ugs.nbp.designer.logic.ControllerFactory;
 
 import java.awt.Font;
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,34 +40,6 @@ public class SelectionSettingsModel implements Serializable {
 
     public void addListener(SelectionSettingsModelListener listener) {
         listeners.add(listener);
-    }
-
-    public void put(EntitySetting key, Object object) {
-        if (key == EntitySetting.WIDTH) {
-            setWidth(parseDouble(object));
-        } else if (key == EntitySetting.HEIGHT) {
-            setHeight(parseDouble(object));
-        } else if (key == EntitySetting.ROTATION) {
-            setRotation(parseDouble(object));
-        } else if (key == EntitySetting.POSITION_X) {
-            setPositionX(parseDouble(object));
-        } else if (key == EntitySetting.POSITION_Y) {
-            setPositionY(parseDouble(object));
-        } else if (key == EntitySetting.CUT_TYPE) {
-            setCutType(parseCutType(object));
-        } else if (key == EntitySetting.TARGET_DEPTH) {
-            setTargetDepth(parseDouble(object));
-        } else if (key == EntitySetting.START_DEPTH) {
-            setStartDepth(parseDouble(object));
-        } else if (key == EntitySetting.TEXT) {
-            setText(object.toString());
-        } else if (key == EntitySetting.FONT_FAMILY) {
-            setFontFamily(object.toString());
-        } else if (key == EntitySetting.ANCHOR) {
-            setAnchor((Anchor) object);
-        } else if (key == EntitySetting.LOCK_RATIO) {
-            setLockRatio((Boolean) object);
-        }
     }
 
     public Object get(EntitySetting key) {
@@ -79,24 +56,11 @@ public class SelectionSettingsModel implements Serializable {
             case FONT_FAMILY -> getFontFamily();
             case ANCHOR -> getAnchor();
             case LOCK_RATIO -> getLockRatio();
+            case SPINDLE_SPEED -> getSpindleSpeed();
+            case PASSES -> getPasses();
+            case FEED_RATE -> getFeedRate();
             default -> throw new SelectionSettingsModelException("Unknown setting " + key);
         };
-    }
-
-    private CutType parseCutType(Object object) {
-        if (object instanceof CutType cutType) {
-            return cutType;
-        }
-
-        throw new SelectionSettingsModelException("Incorrect type");
-    }
-
-    private double parseDouble(Object object) {
-        if (object instanceof Double doubleValue) {
-            return doubleValue;
-        }
-
-        throw new SelectionSettingsModelException("Incorrect type");
     }
 
     public double getWidth() {
@@ -171,6 +135,8 @@ public class SelectionSettingsModel implements Serializable {
         setCutType(CutType.NONE);
         setStartDepth(0);
         setTargetDepth(0);
+        setSpindleSpeed(0);
+        setFeedRate(0);
         setText("");
         setFontFamily(Font.SANS_SERIF);
     }
@@ -219,6 +185,54 @@ public class SelectionSettingsModel implements Serializable {
         }
     }
 
+    public int getSpindleSpeed() {
+        return (Integer) settings.getOrDefault(EntitySetting.SPINDLE_SPEED, 100);
+    }
+
+    public void setSpindleSpeed(Integer speed) {
+        if (!valuesEquals(getSpindleSpeed(), speed)) {
+            if (speed == 0) {
+                speed = 100;
+            }
+            settings.put(EntitySetting.SPINDLE_SPEED, speed);
+            notifyListeners(EntitySetting.SPINDLE_SPEED);
+        }
+    }
+
+    public int getPasses() {
+        return (Integer) settings.getOrDefault(EntitySetting.PASSES, 1);
+    }
+
+    public void setPasses(Integer passes) {
+        if (!valuesEquals(getPasses(), passes)) {
+            passes = Math.max(1, passes);
+            settings.put(EntitySetting.PASSES, passes);
+            notifyListeners(EntitySetting.PASSES);
+        }
+    }
+
+    public int getFeedRate() {
+        return (Integer) settings.getOrDefault(EntitySetting.FEED_RATE, getDefaultFeedRate());
+    }
+
+    public void setFeedRate(Integer feedRate) {
+        if (!valuesEquals(getFeedRate(), feedRate)) {
+            if (feedRate == 0) {
+                feedRate = getDefaultFeedRate();
+            }
+            settings.put(EntitySetting.FEED_RATE, feedRate);
+            notifyListeners(EntitySetting.FEED_RATE);
+        }
+    }
+
+    private int getDefaultFeedRate() {
+        Controller controller = ControllerFactory.getController();
+        if (controller != null && controller.getSettings() != null) {
+            return controller.getSettings().getFeedSpeed();
+        }
+        return 50;
+    }
+
     public String getFontFamily() {
         return (String) settings.getOrDefault(EntitySetting.FONT_FAMILY, Font.SANS_SERIF);
     }
@@ -264,13 +278,69 @@ public class SelectionSettingsModel implements Serializable {
     }
 
     public boolean getLockRatio() {
-        return  (Boolean) settings.getOrDefault(EntitySetting.LOCK_RATIO, true);
+        return (Boolean) settings.getOrDefault(EntitySetting.LOCK_RATIO, true);
     }
 
     public void setLockRatio(boolean lockRatio) {
         if (getLockRatio() != lockRatio) {
             settings.put(EntitySetting.LOCK_RATIO, lockRatio);
             notifyListeners(EntitySetting.LOCK_RATIO);
+        }
+    }
+
+    public void updateFromEntity(Group selectionGroup) {
+        List<EntitySetting> settings = selectionGroup.getSettings();
+        if (settings.contains(EntitySetting.TEXT)) {
+            Text textEntity = (Text) selectionGroup.getChildren().get(0);
+            setText(textEntity.getText());
+        }
+
+        if (settings.contains(EntitySetting.FONT_FAMILY)) {
+            Text textEntity = (Text) selectionGroup.getChildren().get(0);
+            setFontFamily(textEntity.getFontFamily());
+        }
+
+        if (settings.contains(EntitySetting.POSITION_X)) {
+            setPositionX(selectionGroup.getPosition(getAnchor()).getX());
+        }
+
+        if (settings.contains(EntitySetting.POSITION_X)) {
+            setPositionY(selectionGroup.getPosition(getAnchor()).getY());
+        }
+
+        if (settings.contains(EntitySetting.WIDTH)) {
+            setWidth(selectionGroup.getSize().getWidth());
+        }
+
+        if (settings.contains(EntitySetting.HEIGHT)) {
+            setHeight(selectionGroup.getSize().getHeight());
+        }
+
+        if (settings.contains(EntitySetting.ROTATION)) {
+            setRotation(selectionGroup.getRotation());
+        }
+
+        if (settings.contains(EntitySetting.START_DEPTH)) {
+            setStartDepth(selectionGroup.getStartDepth());
+        }
+        if (settings.contains(EntitySetting.TARGET_DEPTH)) {
+            setTargetDepth(selectionGroup.getTargetDepth());
+        }
+
+        if (settings.contains(EntitySetting.CUT_TYPE)) {
+            setCutType(selectionGroup.getCutType());
+        }
+
+        if (settings.contains(EntitySetting.SPINDLE_SPEED)) {
+            setSpindleSpeed(selectionGroup.getSpindleSpeed());
+        }
+
+        if (settings.contains(EntitySetting.PASSES)) {
+            setPasses(selectionGroup.getPasses());
+        }
+
+        if (settings.contains(EntitySetting.FEED_RATE)) {
+            setFeedRate(selectionGroup.getFeedRate());
         }
     }
 }

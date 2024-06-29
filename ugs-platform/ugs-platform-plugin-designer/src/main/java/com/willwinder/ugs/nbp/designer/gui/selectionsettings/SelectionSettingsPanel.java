@@ -41,6 +41,7 @@ import org.openide.util.ImageUtilities;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
+import javax.swing.JSlider;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
@@ -51,6 +52,10 @@ import java.util.Arrays;
  * @author Joacim Breiler
  */
 public class SelectionSettingsPanel extends JPanel implements SelectionListener, EntityListener, SelectionSettingsModelListener {
+    private static final String LABEL_CONSTRAINTS = "grow, hmin 32, hmax 36";
+    private static final String FIELD_CONSTRAINTS_NO_WRAP = "grow, w 60:60:300, hmin 32, hmax 36";
+    private static final String FIELD_CONSTRAINTS = FIELD_CONSTRAINTS_NO_WRAP + ", wrap";
+    private static final String SLIDER_FIELD_CONSTRAINTS = "grow, w 60:60:300, hmin 32, hmax 44";
     private final SelectionSettingsModel model = new SelectionSettingsModel();
     private final transient FieldEventDispatcher fieldEventDispatcher;
     private transient Controller controller;
@@ -58,6 +63,7 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
     private TextFieldWithUnit rotation;
     private TextFieldWithUnit posXTextField;
     private TextFieldWithUnit posYTextField;
+    private JSlider spindleSpeedSlider;
     private JLabel startDepthLabel;
     private JLabel targetDepthLabel;
     private CutTypeCombo cutTypeComboBox;
@@ -73,10 +79,16 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
     private JLabel widthLabel;
     private JLabel heightLabel;
     private JToggleButton lockRatioButton;
+    private JLabel spindleSpeedLabel;
+    private JLabel laserPassesLabel;
+    private JSlider passesSlider;
+    private JLabel feedRateLabel;
+    private UnitSpinner feedRateSpinner;
+    private JLabel cutTypeLabel;
 
     public SelectionSettingsPanel(Controller controller) {
         fieldEventDispatcher = new FieldEventDispatcher();
-        setLayout(new MigLayout("fill, hidemode 3, insets 5", "[sg label] 5 [grow] 5 [60px]"));
+        setLayout(new MigLayout("hidemode 3, insets 10, gap 10", "[sg label] 10 [grow] 10 [60px]"));
         addTextSettingFields();
         addPositionFields();
         addCutFields();
@@ -84,6 +96,10 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         model.addListener(this);
         FieldActionDispatcher fieldActionDispatcher = new FieldActionDispatcher(model, controller);
         fieldEventDispatcher.addListener(fieldActionDispatcher);
+    }
+
+    private static Boolean selectionHasSetting(Group selectionGroup, EntitySetting entitySetting) {
+        return selectionGroup.getSettings().contains(entitySetting);
     }
 
     private void addPositionFields() {
@@ -109,19 +125,19 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
 
         createAndAddLabel(EntitySetting.ROTATION);
         rotation = createAndAddField(EntitySetting.ROTATION, TextFieldUnit.DEGREE, true);
-        add(new JSeparator(), "grow, spanx, wrap");
+        add(new JSeparator(), "hmin 2, grow, spanx, wrap");
     }
 
     private JLabel createAndAddLabel(EntitySetting entitySetting) {
         JLabel label = new JLabel(entitySetting.getLabel(), SwingConstants.RIGHT);
-        add(label, "grow");
+        add(label, LABEL_CONSTRAINTS);
         return label;
     }
 
     private TextFieldWithUnit createAndAddField(EntitySetting setting, TextFieldUnit units, boolean wrap) {
         TextFieldWithUnit field = new TextFieldWithUnit(units, 4, 0);
         fieldEventDispatcher.registerListener(setting, field);
-        add(field, wrap ? "grow, wrap" : "grow");
+        add(field, wrap ? FIELD_CONSTRAINTS : FIELD_CONSTRAINTS_NO_WRAP);
         return field;
     }
 
@@ -129,26 +145,46 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         cutTypeComboBox = new CutTypeCombo();
         fieldEventDispatcher.registerListener(EntitySetting.CUT_TYPE, cutTypeComboBox);
 
-        JLabel cutTypeLabel = new JLabel("Cut type", SwingConstants.RIGHT);
-        add(cutTypeLabel, "grow");
-        add(cutTypeComboBox, "grow, wrap");
+        cutTypeLabel = createAndAddLabel(EntitySetting.CUT_TYPE);
+        add(cutTypeComboBox, FIELD_CONSTRAINTS + ", spanx");
 
-        startDepthLabel = new JLabel("Start depth", SwingConstants.RIGHT);
-        add(startDepthLabel, "grow");
+        feedRateLabel = createAndAddLabel(EntitySetting.FEED_RATE);
+        feedRateSpinner = new UnitSpinner(50, TextFieldUnit.MM_PER_MINUTE, 50d, 10000d, 10d);
+        add(feedRateSpinner, FIELD_CONSTRAINTS + ", spanx");
+        fieldEventDispatcher.registerListener(EntitySetting.FEED_RATE, feedRateSpinner);
 
+        spindleSpeedLabel = createAndAddLabel(EntitySetting.SPINDLE_SPEED);
+        spindleSpeedSlider = new JSlider(0, 100, 0);
+        spindleSpeedSlider.setPaintLabels(true);
+        spindleSpeedSlider.setPaintTicks(true);
+        spindleSpeedSlider.setMinorTickSpacing(5);
+        spindleSpeedSlider.setMajorTickSpacing(25);
+
+        add(spindleSpeedSlider, SLIDER_FIELD_CONSTRAINTS + ", spanx");
+        fieldEventDispatcher.registerListener(EntitySetting.SPINDLE_SPEED, spindleSpeedSlider);
+
+        laserPassesLabel = createAndAddLabel(EntitySetting.PASSES);
+        passesSlider = new JSlider(0, 10, 1);
+        passesSlider.setPaintLabels(true);
+        passesSlider.setPaintTicks(true);
+        passesSlider.setMinorTickSpacing(1);
+        passesSlider.setMajorTickSpacing(5);
+
+        add(passesSlider, SLIDER_FIELD_CONSTRAINTS + ", spanx");
+        fieldEventDispatcher.registerListener(EntitySetting.PASSES, passesSlider);
+
+        startDepthLabel = createAndAddLabel(EntitySetting.START_DEPTH);
         startDepthSpinner = new UnitSpinner(0, TextFieldUnit.MM, null, null, 0.1d);
         startDepthSpinner.setPreferredSize(startDepthSpinner.getPreferredSize());
         fieldEventDispatcher.registerListener(EntitySetting.START_DEPTH, startDepthSpinner);
-        add(startDepthSpinner, "grow, wrap");
+        add(startDepthSpinner, FIELD_CONSTRAINTS + ", spanx");
 
-        targetDepthLabel = new JLabel("Target depth", SwingConstants.RIGHT);
-        add(targetDepthLabel, "grow");
-
+        targetDepthLabel = createAndAddLabel(EntitySetting.TARGET_DEPTH);
         targetDepthSpinner = new UnitSpinner(0, TextFieldUnit.MM, 0d, null, 0.1d);
 
         targetDepthSpinner.setPreferredSize(targetDepthSpinner.getPreferredSize());
         fieldEventDispatcher.registerListener(EntitySetting.TARGET_DEPTH, targetDepthSpinner);
-        add(targetDepthSpinner, "grow, wrap");
+        add(targetDepthSpinner, FIELD_CONSTRAINTS + ", spanx");
         setEnabled(false);
     }
 
@@ -158,7 +194,6 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         this.controller.getSelectionManager().addListener(this);
     }
 
-
     private void addTextSettingFields() {
         textLabel = new JLabel("Text", SwingConstants.RIGHT);
         textLabel.setVisible(false);
@@ -167,7 +202,7 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         textTextField = new JTextField();
         textTextField.setVisible(false);
         fieldEventDispatcher.registerListener(EntitySetting.TEXT, textTextField);
-        add(textTextField, "grow, wrap");
+        add(textTextField, FIELD_CONSTRAINTS + ", spanx");
 
         fontLabel = new JLabel("Font", SwingConstants.RIGHT);
         fontLabel.setVisible(false);
@@ -176,11 +211,11 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         fontDropDown = new FontCombo();
         fieldEventDispatcher.registerListener(EntitySetting.FONT_FAMILY, fontDropDown);
         fontDropDown.setVisible(false);
-        add(fontDropDown, "grow, wrap");
+        add(fontDropDown, FIELD_CONSTRAINTS + ", spanx");
 
         fontSeparator = new JSeparator(SwingConstants.HORIZONTAL);
         fontSeparator.setVisible(false);
-        add(fontSeparator, "grow, spanx, wrap");
+        add(fontSeparator, "hmin 2, grow, spanx, wrap");
     }
 
     @Override
@@ -198,7 +233,10 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
 
     @Override
     public void onSelectionEvent(SelectionEvent selectionEvent) {
+        // Temporarily disable the field event dispatcher so that it won't trigger updates on select
+        fieldEventDispatcher.setEnabled(false);
         onEvent(new EntityEvent(controller.getSelectionManager(), EventType.SELECTED));
+        fieldEventDispatcher.setEnabled(true);
     }
 
     @Override
@@ -211,21 +249,7 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
         }
 
         setEnabled(true);
-        boolean isTextCuttable = selectionGroup.getChildren().get(0) instanceof Text;
-        if (isTextCuttable) {
-            Text textEntity = (Text) selectionGroup.getChildren().get(0);
-            model.setText(textEntity.getText());
-            model.setFontFamily(textEntity.getFontFamily());
-        }
-
-        model.setPositionX(selectionGroup.getPosition(model.getAnchor()).getX());
-        model.setPositionY(selectionGroup.getPosition(model.getAnchor()).getY());
-        model.setWidth(selectionGroup.getSize().getWidth());
-        model.setHeight(selectionGroup.getSize().getHeight());
-        model.setRotation(selectionGroup.getRotation());
-        model.setStartDepth(selectionGroup.getStartDepth());
-        model.setTargetDepth(selectionGroup.getTargetDepth());
-        model.setCutType(selectionGroup.getCutType());
+        model.updateFromEntity(selectionGroup);
         controller.getDrawing().invalidate();
     }
 
@@ -277,38 +301,77 @@ public class SelectionSettingsPanel extends JPanel implements SelectionListener,
             }
         } else if (entitySetting == EntitySetting.LOCK_RATIO) {
             lockRatioButton.setSelected(!model.getLockRatio());
+        } else if (entitySetting == EntitySetting.SPINDLE_SPEED) {
+            spindleSpeedSlider.setValue(model.getSpindleSpeed());
+            selectionGroup.setSpindleSpeed(model.getSpindleSpeed());
+        } else if (entitySetting == EntitySetting.PASSES) {
+            passesSlider.setValue(model.getPasses());
+            selectionGroup.setPasses(model.getPasses());
+        } else if (entitySetting == EntitySetting.FEED_RATE) {
+            feedRateSpinner.setValue(model.getFeedRate());
+            selectionGroup.setFeedRate(model.getFeedRate());
         }
 
-        final boolean hasCutTypeSelection = selectionGroup.getCutType() != CutType.NONE;
+        handleComponentVisibility(selectionGroup);
+    }
+
+    private void handleComponentVisibility(Group selectionGroup) {
+        CutType cutType = selectionGroup.getCutType();
+
+        boolean hasCutType = selectionHasSetting(selectionGroup, EntitySetting.CUT_TYPE);
+        cutTypeComboBox.setVisible(hasCutType);
+        cutTypeLabel.setVisible(hasCutType);
+
+        final boolean hasCutTypeSelection = cutType != CutType.NONE;
         startDepthSpinner.setEnabled(hasCutTypeSelection);
         startDepthLabel.setEnabled(hasCutTypeSelection);
         targetDepthSpinner.setEnabled(hasCutTypeSelection);
         targetDepthLabel.setEnabled(hasCutTypeSelection);
 
-        boolean isTextCuttable = firstChildHasSetting(selectionGroup, EntitySetting.TEXT);
+        boolean isTextCuttable = selectionHasSetting(selectionGroup, EntitySetting.TEXT);
         textTextField.setVisible(isTextCuttable);
         textLabel.setVisible(isTextCuttable);
         fontLabel.setVisible(isTextCuttable);
         fontDropDown.setVisible(isTextCuttable);
         fontSeparator.setVisible(isTextCuttable);
 
-        boolean hasWidth = firstChildHasSetting(selectionGroup, EntitySetting.WIDTH);
+        boolean hasWidth = selectionHasSetting(selectionGroup, EntitySetting.WIDTH);
         widthLabel.setVisible(hasWidth);
         widthTextField.setVisible(hasWidth);
 
-        boolean hasHeight = firstChildHasSetting(selectionGroup, EntitySetting.HEIGHT);
+        boolean hasHeight = selectionHasSetting(selectionGroup, EntitySetting.HEIGHT);
         heightLabel.setVisible(hasHeight);
         heightTextField.setVisible(hasHeight);
 
-        boolean hasAnchor = firstChildHasSetting(selectionGroup, EntitySetting.ANCHOR);
+        boolean hasAnchor = selectionHasSetting(selectionGroup, EntitySetting.ANCHOR);
         anchorSelector.setVisible(hasAnchor);
 
-        lockRatioButton.setVisible(hasWidth && hasHeight);
-    }
+        boolean hasStartDepth = selectionHasSetting(selectionGroup, EntitySetting.START_DEPTH) &&
+                cutType.getSettings().contains(EntitySetting.START_DEPTH);
+        startDepthSpinner.setVisible(hasStartDepth);
+        startDepthLabel.setVisible(hasStartDepth);
 
-    private static Boolean firstChildHasSetting(Group selectionGroup, EntitySetting entitySetting) {
-        return selectionGroup.getFirstChild()
-                .map(firstChild -> firstChild.getSettings().contains(entitySetting))
-                .orElse(false);
+        boolean hasTargetDepth = selectionHasSetting(selectionGroup, EntitySetting.TARGET_DEPTH) &&
+                cutType.getSettings().contains(EntitySetting.TARGET_DEPTH);
+        targetDepthSpinner.setVisible(hasTargetDepth);
+        targetDepthLabel.setVisible(hasTargetDepth);
+
+        boolean hasLaserPower = selectionHasSetting(selectionGroup, EntitySetting.SPINDLE_SPEED) &&
+                cutType.getSettings().contains(EntitySetting.SPINDLE_SPEED);
+        spindleSpeedLabel.setText(cutType == CutType.LASER_FILL || cutType == CutType.LASER_ON_PATH ? "Power" : EntitySetting.SPINDLE_SPEED.getLabel());
+        spindleSpeedLabel.setVisible(hasLaserPower);
+        spindleSpeedSlider.setVisible(hasLaserPower);
+
+        boolean hasLaserPasses = selectionHasSetting(selectionGroup, EntitySetting.PASSES) &&
+                cutType.getSettings().contains(EntitySetting.PASSES);
+        laserPassesLabel.setVisible(hasLaserPasses);
+        passesSlider.setVisible(hasLaserPasses);
+
+        boolean hasFeedRate = selectionHasSetting(selectionGroup, EntitySetting.FEED_RATE) &&
+                cutType.getSettings().contains(EntitySetting.FEED_RATE);
+        feedRateLabel.setVisible(hasFeedRate);
+        feedRateSpinner.setVisible(hasFeedRate);
+
+        lockRatioButton.setVisible(hasWidth && hasHeight);
     }
 }
